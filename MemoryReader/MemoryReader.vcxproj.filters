@@ -24,12 +24,21 @@
     </Inf>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Driver.c">
+    <ClCompile Include="Driver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Driver.h">
+    <ClInclude Include="Driver.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LinkedList.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ListNode.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="new.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

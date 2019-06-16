@@ -140,6 +140,11 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
   </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalOptions>/kernel %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <Inf Include="MemoryReader.inf" />
   </ItemGroup>
@@ -147,10 +152,13 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Driver.c" />
+    <ClCompile Include="Driver.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Driver.h" />
+    <ClInclude Include="Driver.hpp" />
+    <ClInclude Include="LinkedList.hpp" />
+    <ClInclude Include="ListNode.hpp" />
+    <ClInclude Include="new.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

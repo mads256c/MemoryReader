@@ -1,13 +1,16 @@
 #include <stdio.h>
 
-#include "Driver.h"
+#include "Driver.hpp"
+#include "ListNode.hpp"
+#include "LinkedList.hpp"
 
+#include "new.hpp"
 
-ParentProcessPair* processes;
+LinkedList<ParentProcessPair*>* processes_new;
 
 PHYSICAL_ADDRESS maxaddr;
 
-NTSTATUS DriverEntry(
+extern "C" NTSTATUS DriverEntry(
 	_In_ PDRIVER_OBJECT     DriverObject,
 	_In_ PUNICODE_STRING    RegistryPath)
 {
@@ -36,21 +39,15 @@ NTSTATUS DriverEntry(
 	// Print "Hello World" for DriverEntry
 	DebugLog("Loading driver");
 
-	
+
 	maxaddr.QuadPart = MAXULONG64;
 
-	processes = MmAllocateContiguousMemory(sizeof(ParentProcessPair) * PROCESSES_MAX, maxaddr);
+	processes_new = new LinkedList<ParentProcessPair*>();
 
-	if (processes == NULL)
-	{
-		DebugLog("Failed to allocate processes array");
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
 
-	RtlSecureZeroMemory(processes, sizeof(ParentProcessPair) * PROCESSES_MAX);
 	PsSetCreateProcessNotifyRoutine(CreateProcessNotifyRoutine, FALSE);
 
-	
+
 
 
 	// Initialize the driver configuration object to register the
@@ -72,41 +69,37 @@ NTSTATUS DriverEntry(
 }
 
 
-VOID CreateProcessNotifyRoutine(HANDLE ParentId, HANDLE ProcessId, BOOLEAN Create)
+extern "C" VOID CreateProcessNotifyRoutine(HANDLE ParentId, HANDLE ProcessId, BOOLEAN Create)
 {
 	PAGED_CODE();
 
 	if (Create)
 	{
-		for (int i = 0; i < PROCESSES_MAX; i++)
+		auto process_info = new ParentProcessPair();
+		process_info->ParentId = ParentId;
+		process_info->ProcessId = ProcessId;
+
+		NTSTATUS status = GetImageName(ProcessId, process_info->ImageName, sizeof(process_info->ImageName));
+		if (status != STATUS_SUCCESS)
 		{
-			if (processes[i].ParentId == NULL && processes[i].ProcessId == NULL)
-			{
-				NTSTATUS status = GetImageName(ProcessId, processes[i].ImageName, 256);
-
-				if (status != STATUS_SUCCESS) return;
-
-				processes[i].ParentId = ParentId;
-				processes[i].ProcessId = ProcessId;
-				DebugLog("PrintProcesses returned with: %02x", PrintProcesses());
-				if (GetProcessHandle("cmd.exe")) DebugLog("cmd.exe is alive!");
-				return;
-			}
+			strcpy_s(process_info->ImageName, "GetImageName failed!");
 		}
-		DebugLog("No more space for processes");
+
+		processes_new->insert(process_info);
+
+		PrintProcesses2();
 	}
 	else
 	{
-		for (int i = 0; i < PROCESSES_MAX; i++)
+		for (auto node = processes_new->head(); node != nullptr; node = node->next)
 		{
-			if (processes[i].ParentId == ParentId && processes[i].ProcessId == ProcessId)
+			if (node->data->ParentId == ParentId && node->data->ProcessId == ProcessId)
 			{
-				processes[i].ParentId = NULL;
-				processes[i].ProcessId = NULL;
-				DebugLog("PrintProcesses returned with: %02x", PrintProcesses());
+				processes_new->remove(node);
 				return;
 			}
 		}
+
 		char string[256] = { 0 };
 		const NTSTATUS status = GetImageName(ProcessId, string, sizeof(string));
 		if (status == STATUS_SUCCESS)
@@ -118,15 +111,15 @@ VOID CreateProcessNotifyRoutine(HANDLE ParentId, HANDLE ProcessId, BOOLEAN Creat
 			DebugLog("Did not have the process %p and GetImageName failed with %02x", ProcessId, status);
 		}
 
-		
+
 	}
 
-	
-	
+
+
 	//DbgPrint("Process created with ParentId: %p ProcessId: %p and Create: %d\n", ParentId, ProcessId, Create);
 }
 
-NTSTATUS DriverDeviceAdd(
+extern "C" NTSTATUS DriverDeviceAdd(
 	_In_    WDFDRIVER       Driver,
 	_Inout_ PWDFDEVICE_INIT DeviceInit
 )
@@ -136,7 +129,7 @@ NTSTATUS DriverDeviceAdd(
 	UNREFERENCED_PARAMETER(Driver);
 
 	PAGED_CODE();
-	
+
 	NTSTATUS status;
 
 	// Allocate the device object
@@ -155,7 +148,7 @@ NTSTATUS DriverDeviceAdd(
 }
 
 
-VOID DriverUnload(IN WDFDRIVER Driver)
+extern "C" VOID DriverUnload(IN WDFDRIVER Driver)
 {
 	UNREFERENCED_PARAMETER(Driver);
 
@@ -163,31 +156,30 @@ VOID DriverUnload(IN WDFDRIVER Driver)
 
 	DebugLog("Unloading driver special");
 
-	if (processes != NULL)
+	if (processes_new != NULL)
 	{
 		PsSetCreateProcessNotifyRoutine(CreateProcessNotifyRoutine, TRUE);
-		MmFreeContiguousMemory(processes);
-		processes = NULL;
+		delete processes_new;
 	}
-	
 }
 
-NTSTATUS PrintProcesses()
+
+NTSTATUS PrintProcesses2()
 {
 	PAGED_CODE();
 
-	DebugLog("****** Processes ******");
+	DebugLog("****** Processes2 ******");
 
-	for (int i = 0; i < PROCESSES_MAX; i++)
+	for (auto node = processes_new->head(); node != nullptr; node = node->next)
 	{
-		if (processes[i].ParentId == NULL || processes[i].ProcessId == NULL) continue;
-		DebugLog("%s %p %p", processes[i].ImageName, processes[i].ParentId, processes[i].ProcessId);
+		DebugLog("%s %p %p", node->data->ImageName, node->data->ParentId, node->data->ProcessId);
 	}
 
-	DebugLog("***********************");
+	DebugLog("************************");
 
 	return STATUS_SUCCESS;
 }
+
 
 NTSTATUS GetImageName(HANDLE ProcessId, char* string, SIZE_T size)
 {
@@ -266,7 +258,7 @@ NTSTATUS GetImageName(HANDLE ProcessId, char* string, SIZE_T size)
 	{
 		p++;
 	}
-	
+
 
 	if (strcpy_s(string, size, p) != 0) return STATUS_ABANDONED;
 
@@ -277,11 +269,9 @@ HANDLE GetProcessHandle(const char* module_name)
 {
 	PAGED_CODE();
 
-	for (int i = 0; i < PROCESSES_MAX; ++i)
+	for (auto node = processes_new->head(); node != nullptr; node = node->next)
 	{
-		if (processes[i].ParentId == NULL || processes[i].ProcessId == NULL) continue;
-
-		if (strcmp(module_name, processes[i].ImageName) == 0) return processes[i].ProcessId;
+		if (strcmp(module_name, node->data->ImageName) == 0) return node->data->ProcessId;
 	}
 
 	return NULL;
