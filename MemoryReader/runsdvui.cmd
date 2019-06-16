@@ -1,0 +1,2 @@
+cd /d "C:\Users\Mads\Documents\GitHub\MemoryReader\MemoryReader" &msbuild "MemoryReader.vcxproj" /t:sdvViewer /p:configuration="Debug" /p:platform="Win32" /p:SolutionDir="C:\Users\Mads\Documents\GitHub\MemoryReader" 
+exit %errorlevel% 

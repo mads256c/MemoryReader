@@ -1,0 +1,193 @@
+
+Microsoft (R) Windows Debugger Version 10.0.18362.1 AMD64
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+Using NET for debugging
+Opened WinSock 2.0
+Waiting to reconnect...
+Connected to target 192.168.1.138 on port 50000 on local IP 192.168.1.104.
+You can get the target MAC address by running .kdtargetmac command.
+Connected to Windows 10 17763 x64 target at (Sat Jun 15 14:21:20.226 2019 (UTC + 2:00)), ptr64 TRUE
+Kernel Debugger connection established.
+Symbol search path is: srv*
+Executable search path is: 
+Windows 10 Kernel Version 17763 MP (1 procs) Free x64
+Product: WinNt, suite: TerminalServer SingleUserTS
+Built by: 17763.1.amd64fre.rs5_release.180914-1434
+Machine Name:
+Kernel base = 0xfffff806`3261f000 PsLoadedModuleList = 0xfffff806`32a3a5d0
+Debug session time: Sat Jun 15 14:18:09.207 2019 (UTC + 2:00)
+System Uptime: 0 days 0:09:25.848
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff806`327dab60 cc              int     3
+kd> g
+WDTF_TARGETS              :  - Query("INF::FileName='oem7.inf'")
+WDTF_TARGETS              :          Target: MemoryReader Device ROOT\SAMPLE\0000 
+WDTF_TARGETS              :  - GetInterfacesIfExist("PNP")
+WDTF_TARGETS              :          Target: MemoryReader Device ROOT\SAMPLE\0000 
+WDTF_PNP                  :  - DIFRemoveDevice()
+WDTF_PNP                  :          Target: MemoryReader Device ROOT\SAMPLE\0000 
+WDTF_DRIVER_SETUP_SYSTEM  :  - RemoveDriverPackage()
+WDTF_DRIVER_SETUP_SYSTEM  :          C:\Windows\inf\oem7.inf
+WDTF_DRIVER_SETUP_SYSTEM  :  - SnapTriageLogs()
+WDTF_DRIVER_SETUP_SYSTEM  :          Target: VIRTUAL-MADS
+EndGroup: DriverTestTasks::_DriverRemoval [Passed]
+Destroying class [DriverTestTasks].
+Invoking method [ModuleCleanup].
+
+Summary: Total=1, Passed=1, Failed=0, Blocked=0, Not Run=0, Skipped=0
+Invalid parameter passed to C runtime function.
+Invalid parameter passed to C runtime function.
+Test Authoring and Execution Framework v10.34k for x64
+Invoking method [ModuleSetup].
+Instantiating class [DriverTestTasks].
+
+StartGroup: DriverTestTasks::_DriverPreparation
+Invoking method [DriverTestTasks::_DriverPreparation].
+Driver Certificate File: MemoryReader.cer
+Driver Inf File: MemoryReader.inf
+Driver Hardware ID: Root\MemoryReader
+Driver package GUID: x64
+Import Driver To Store: 1
+Uninstall Driver: 1
+Retrieving parameters...
+Binary Path: 'certutil.exe'
+Arguments: '-f -addstore ROOT "%SystemDrive%\DriverTest\Drivers\MemoryReader.cer"'
+Exit Codes: '0'
+Capture console output: 
+Working Folder: 
+Custom Reboot: 
+Use Pipes: 
+Executing command line: "certutil.exe" -f -addstore ROOT "C:\DriverTest\Drivers\MemoryReader.cer"
+ROOT "Trusted Root Certification Authorities"
+Signature matches Public Key
+Related Certificates:
+Exact match:
+Element 0:
+Serial Number: 162980df2b87f9834b91c63f38966d49
+Issuer: CN=WDKTestCert Mads,132050211210052548
+ NotBefore: 14/06/2019 23.25
+ NotAfter: 14/06/2029 02.00
+Subject: CN=WDKTestCert Mads,132050211210052548
+Signature matches Public Key
+Root Certificate: Subject matches Issuer
+Cert Hash(sha1): e174697e5a0e9c7199b9dd1b30d709fbf6f2e20b
+Certificate "WDKTestCert Mads,132050211210052548" already in store.
+CertUtil: -addstore command completed successfully.
+Process exit code: 0
+Exit code matches a valid passing exit code
+TestPassed: Process completed successfully
+Retrieving parameters...
+Binary Path: '"certutil.exe"'
+Arguments: '-f -addstore TrustedPublisher "%SystemDrive%\DriverTest\Drivers\MemoryReader.cer"'
+Exit Codes: '0'
+Capture console output: 
+Working Folder: 
+Custom Reboot: 
+Use Pipes: 
+Executing command line: "certutil.exe" -f -addstore TrustedPublisher "C:\DriverTest\Drivers\MemoryReader.cer"
+TrustedPublisher "Trusted Publishers"
+Signature matches Public Key
+Related Certificates:
+Exact match:
+Element 0:
+Serial Number: 162980df2b87f9834b91c63f38966d49
+Issuer: CN=WDKTestCert Mads,132050211210052548
+ NotBefore: 14/06/2019 23.25
+ NotAfter: 14/06/2029 02.00
+Subject: CN=WDKTestCert Mads,132050211210052548
+Signature matches Public Key
+Root Certificate: Subject matches Issuer
+Cert Hash(sha1): e174697e5a0e9c7199b9dd1b30d709fbf6f2e20b
+Certificate "WDKTestCert Mads,132050211210052548" already in store.
+CertUtil: -addstore command completed successfully.
+Process exit code: 0
+Exit code matches a valid passing exit code
+TestPassed: Process completed successfully
+Driver package imported successfully: oem7.inf
+EndGroup: DriverTestTasks::_DriverPreparation [Passed]
+Destroying class [DriverTestTasks].
+Invoking method [ModuleCleanup].
+
+Summary: Total=1, Passed=1, Failed=0, Blocked=0, Not Run=0, Skipped=0
+Invalid parameter passed to C runtime function.
+Invalid parameter passed to C runtime function.
+Test Authoring and Execution Framework v10.34k for x64
+Invoking method [ModuleSetup].
+Instantiating class [DriverTestTasks].
+
+StartGroup: DriverTestTasks::_RunProcess
+Invoking method [DriverTestTasks::_RunProcess].
+Retrieving parameters...
+Binary Path: 'C:\DriverTest\devcon.exe'
+Arguments: '-f install C:\DriverTest\Drivers\MemoryReader.inf Root\MemoryReader'
+Exit Codes: '0'
+Capture console output: 
+Working Folder: C:\DriverTest\Drivers
+Custom Reboot: 
+Use Pipes: 
+Executing command line: "C:\DriverTest\devcon.exe" -f install C:\DriverTest\Drivers\MemoryReader.inf Root\MemoryReader
+Hello world!Process exit code: 0
+Exit code matches a valid passing exit code
+TestPassed: Process completed successfully
+EndGroup: DriverTestTasks::_RunProcess [Passed]
+Destroying class [DriverTestTasks].
+Invoking method [ModuleCleanup].
+
+Summary: Total=1, Passed=1, Failed=0, Blocked=0, Not Run=0, Skipped=0
+Invalid parameter passed to C runtime function.
+Invalid parameter passed to C runtime function.
+Test Authoring and Execution Framework v10.34k for x64
+Invoking method [ModuleSetup].
+Instantiating class [DriverTestTasks].
+
+StartGroup: DriverTestTasks::_DriverPostInstall
+Invoking method [DriverTestTasks::_DriverPostInstall].
+EndGroup: DriverTestTasks::_DriverPostInstall [Passed]
+Destroying class [DriverTestTasks].
+Invoking method [ModuleCleanup].
+
+Summary: Total=1, Passed=1, Failed=0, Blocked=0, Not Run=0, Skipped=0
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run console kernel debugger) or,                       *
+*       CTRL+BREAK (if you run GUI kernel debugger),                          *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!DbgBreakPointWithStatus:
+fffff806`327dab60 cc              int     3
+kd> lm
+start             end                 module name
+fffff806`3261f000 fffff806`33090000   nt         (pdb symbols)          C:\ProgramData\dbg\sym\ntkrnlmp.pdb\D3537F328D1240991ED277D110ECE6611\ntkrnlmp.pdb
+fffff806`35240000 fffff806`35247000   MemoryReader   (deferred)             
+
+Unloaded modules:
+fffff808`2f400000 fffff808`2f410000   dump_storport.sys
+fffff808`2f440000 fffff808`2f46e000   dump_storahci.sys
+fffff808`2f490000 fffff808`2f4ae000   dump_dumpfve.sys
+fffff808`306b0000 fffff808`306cc000   dam.sys 
+fffff808`2f310000 fffff808`2f320000   hwpolicy.sys

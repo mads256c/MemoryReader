@@ -1,0 +1,227 @@
+#include <ntifs.h>
+#include <ntddk.h>
+#include <wdf.h>
+
+NTKERNELAPI
+PPEB
+NTAPI
+PsGetProcessPeb(IN PEPROCESS Process);
+
+typedef struct _PEB_LDR_DATA
+{
+	ULONG Length;
+	UCHAR Initialized;
+	PVOID SsHandle;
+	LIST_ENTRY InLoadOrderModuleList;
+	LIST_ENTRY InMemoryOrderModuleList;
+	LIST_ENTRY InInitializationOrderModuleList;
+} PEB_LDR_DATA, * PPEB_LDR_DATA;
+
+typedef struct _PEB
+{
+	UCHAR InheritedAddressSpace;
+	UCHAR ReadImageFileExecOptions;
+	UCHAR BeingDebugged;
+	UCHAR BitField;
+	PVOID Mutant;
+	PVOID ImageBaseAddress;
+	PPEB_LDR_DATA Ldr;
+	PVOID ProcessParameters;
+	PVOID SubSystemData;
+	PVOID ProcessHeap;
+	PVOID FastPebLock;
+	PVOID AtlThunkSListPtr;
+	PVOID IFEOKey;
+	PVOID CrossProcessFlags;
+	PVOID KernelCallbackTable;
+	ULONG SystemReserved;
+	ULONG AtlThunkSListPtr32;
+	PVOID ApiSetMap;
+} PEB, * PPEB;
+
+typedef struct _LDR_DATA_TABLE_ENTRY
+{
+	LIST_ENTRY InLoadOrderLinks;
+	LIST_ENTRY InMemoryOrderLinks;
+	LIST_ENTRY InInitializationOrderLinks;
+	PVOID DllBase;
+	PVOID EntryPoint;
+	ULONG SizeOfImage;
+	UNICODE_STRING FullDllName;
+	UNICODE_STRING BaseDllName;
+	ULONG Flags;
+	USHORT LoadCount;
+	USHORT TlsIndex;
+	LIST_ENTRY HashLinks;
+	ULONG TimeDateStamp;
+} LDR_DATA_TABLE_ENTRY, * PLDR_DATA_TABLE_ENTRY;
+
+DRIVER_INITIALIZE DriverEntry;
+EVT_WDF_DRIVER_DEVICE_ADD KmdfHelloWorldEvtDeviceAdd;
+int pid = 6304;
+UNICODE_STRING ustrdll;
+
+
+
+HANDLE GetPid(char* process_name)
+{
+	PEPROCESS system_process = NULL;
+
+	system_process = PsGetCurrentProcess();
+
+	if (!system_process)
+	{
+		DbgPrint("Could not get system process");
+		return (HANDLE)-1;
+	}
+
+	if (IsListEmpty(&system_process->ActiveProcessLinks))
+	{
+		DbgPrint("No processes");
+		return (HANDLE)-1;
+	}
+
+	PLIST_ENTRY pNextEntry, pListHead;
+
+	pListHead = &system_process->ActiveProcessLinks;
+
+	pNextEntry = pListHead->Flink;
+
+	while (pNextEntry != pListHead) {
+		system_process = CONTAINING_RECORD(pNextEntry, EPROCESS, ActiveProcessLinks);
+
+		if (system_process->ActiveThreads)
+			if (!IsListEmpty(&system_process->ThreadListHead)) {
+				//if( _strnicmp( PeProcess->ImageFileName, ProcessName ,strlen(ProcessName) ) == 0 )                                 //  return PsGetProcessId( PeProcess );
+
+				DbgPrint("Process name: %s - PID:%d\n", system_process->ImageFileName, system_process->UniqueProcessId);
+
+
+			}
+		system_process = NULL;
+
+		pNextEntry = pNextEntry->Flink;
+
+
+	}
+
+	return (HANDLE)-1;
+}
+
+NTSTATUS DriverEntry(
+	_In_ PDRIVER_OBJECT     DriverObject,
+	_In_ PUNICODE_STRING    RegistryPath)
+{
+	// NTSTATUS variable to record success or failure
+	NTSTATUS status = STATUS_SUCCESS;
+
+	RtlInitUnicodeString(&ustrdll, L"ModifyMe.exe");
+
+	// Allocate the driver configuration object
+	WDF_DRIVER_CONFIG config;
+
+	// Print "Hello World" for DriverEntry
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "KmdfHelloWorld: DriverEntry\n"));
+	DbgPrint("Hello world!\n");
+
+	
+
+
+
+	PEPROCESS process = NULL;
+
+	NTSTATUS s = PsLookupProcessByProcessId((HANDLE)pid, &process);
+
+	DbgPrint("STATUS: %ld process: %p\n", s, process);
+
+	KAPC_STATE state;
+	RtlSecureZeroMemory(&state, sizeof(state));
+
+	KeStackAttachProcess(process, &state);
+
+	PPEB peb = PsGetProcessPeb(process);
+
+	void* modifyme_base = NULL;
+
+	if (peb)
+	{
+		if (peb->Ldr)
+		{
+			DbgPrint("****** Modules ******\n");
+			for (PLIST_ENTRY pListEntry = peb->Ldr->InLoadOrderModuleList.Flink;
+				pListEntry != &peb->Ldr->InLoadOrderModuleList;
+				pListEntry = pListEntry->Flink)
+			{
+				PLDR_DATA_TABLE_ENTRY pEntry = CONTAINING_RECORD(pListEntry, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
+				DbgPrint("%wZ\n", &pEntry->BaseDllName);
+				if (RtlCompareUnicodeString(&pEntry->BaseDllName, &ustrdll, TRUE) == 0)
+				{
+					modifyme_base = pEntry->DllBase;
+				}
+			}
+
+			DbgPrint("*********************\n");
+
+			DbgPrint("ModifyMe.exe base: %p\n", modifyme_base);
+
+			char* helloworldstr = (char*)modifyme_base + 0x1C000;
+
+			DbgPrint("String location: %p\n", helloworldstr);
+			DbgPrint("Extracted string: %s\n", helloworldstr);
+		}
+		else
+		{
+			DbgPrint("Could not get Ldr\n");
+		}
+		
+	}
+	else
+	{
+		DbgPrint("Could not get peb\n");
+	}
+
+
+	KeUnstackDetachProcess(&state);
+
+
+	// Initialize the driver configuration object to register the
+	// entry point for the EvtDeviceAdd callback, KmdfHelloWorldEvtDeviceAdd
+	WDF_DRIVER_CONFIG_INIT(&config,
+		KmdfHelloWorldEvtDeviceAdd
+	);
+
+	// Finally, create the driver object
+	status = WdfDriverCreate(DriverObject,
+		RegistryPath,
+		WDF_NO_OBJECT_ATTRIBUTES,
+		&config,
+		WDF_NO_HANDLE
+	);
+	return status;
+}
+
+NTSTATUS
+KmdfHelloWorldEvtDeviceAdd(
+	_In_    WDFDRIVER       Driver,
+	_Inout_ PWDFDEVICE_INIT DeviceInit
+)
+{
+	// We're not using the driver object,
+	// so we need to mark it as unreferenced
+	UNREFERENCED_PARAMETER(Driver);
+
+	NTSTATUS status;
+
+	// Allocate the device object
+	WDFDEVICE hDevice;
+
+	// Print "Hello World"
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "KmdfHelloWorld: KmdfHelloWorldEvtDeviceAdd\n"));
+
+	// Create the device object
+	status = WdfDeviceCreate(&DeviceInit,
+		WDF_NO_OBJECT_ATTRIBUTES,
+		&hDevice
+	);
+	return status;
+}
