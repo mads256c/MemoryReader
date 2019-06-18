@@ -3,11 +3,11 @@
 #include <cstddef>
 
 
-void* operator new(size_t size){
-	PHYSICAL_ADDRESS max_address;
-	max_address.QuadPart = MAXULONG64;
+#include "Util.h"
 
-	void * p = MmAllocateContiguousMemory(size, max_address);
+
+void* operator new(size_t size){
+	void* p = ExAllocatePoolWithTag(PagedPool, size, 'wenO');
 
 	DebugLog("Creating %p", p);
 
@@ -20,7 +20,7 @@ void* operator new[](size_t size) {
 
 void operator delete(void* address){
 	DebugLog("Deleting %p", address);
-	MmFreeContiguousMemory(address);
+	ExFreePoolWithTag(address, 'wenO');
 }
 
 void operator delete(void* address, size_t size){

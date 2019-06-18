@@ -3,12 +3,17 @@
 #include "Driver.hpp"
 #include "ListNode.hpp"
 #include "LinkedList.hpp"
+#include "ProcessInfo.h"
+#include "PEProcessWrapper.hpp"
+#include "Util.h"
+#include "ObHandleWrapper.hpp"
+#include "BufferWrapper.hpp"
+#include "String.hpp"
 
 #include "new.hpp"
 
-LinkedList<ParentProcessPair*>* processes_new;
+LinkedList<ProcessInfo*>* process_list;
 
-PHYSICAL_ADDRESS maxaddr;
 
 extern "C" NTSTATUS DriverEntry(
 	_In_ PDRIVER_OBJECT     DriverObject,
@@ -25,9 +30,9 @@ extern "C" NTSTATUS DriverEntry(
 	RtlInitUnicodeString(&routineName, L"ZwQueryInformationProcess");
 
 	ZwQueryInformationProcess =
-		(QUERY_INFO_PROCESS)MmGetSystemRoutineAddress(&routineName);
+		static_cast<QUERY_INFO_PROCESS>(MmGetSystemRoutineAddress(&routineName));
 
-	if (ZwQueryInformationProcess == NULL)
+	if (ZwQueryInformationProcess == nullptr)
 	{
 		DbgPrint("MemoryReader: Could not get ZwQueryInformationProcess\n");
 		return STATUS_ABANDONED;
@@ -40,12 +45,15 @@ extern "C" NTSTATUS DriverEntry(
 	DebugLog("Loading driver");
 
 
-	maxaddr.QuadPart = MAXULONG64;
-
-	processes_new = new LinkedList<ParentProcessPair*>();
+	process_list = new LinkedList<ProcessInfo*>();
 
 
-	PsSetCreateProcessNotifyRoutine(CreateProcessNotifyRoutine, FALSE);
+	status = PsSetCreateProcessNotifyRoutine(CreateProcessNotifyRoutine, FALSE);
+	if (status != STATUS_SUCCESS)
+	{
+		DebugLog("Could not set CreateProcessNotifyRoutine");
+		return status;
+	}
 
 
 
@@ -75,48 +83,41 @@ extern "C" VOID CreateProcessNotifyRoutine(HANDLE ParentId, HANDLE ProcessId, BO
 
 	if (Create)
 	{
-		auto process_info = new ParentProcessPair();
-		process_info->ParentId = ParentId;
-		process_info->ProcessId = ProcessId;
+		auto process_info = new ProcessInfo(ParentId, ProcessId);
 
-		NTSTATUS status = GetImageName(ProcessId, process_info->ImageName, sizeof(process_info->ImageName));
+		NTSTATUS status = GetImageName(ProcessId, &process_info->image_name);
 		if (status != STATUS_SUCCESS)
 		{
-			strcpy_s(process_info->ImageName, "GetImageName failed!");
+			process_info->image_name.allocate("GetImageName failed!");
 		}
 
-		processes_new->insert(process_info);
+		process_list->insert(process_info);
 
-		PrintProcesses2();
+		PrintProcesses();
 	}
 	else
 	{
-		for (auto node = processes_new->head(); node != nullptr; node = node->next)
+		for (auto node = process_list->head(); node != nullptr; node = node->next)
 		{
-			if (node->data->ParentId == ParentId && node->data->ProcessId == ProcessId)
+			if (node->data->parent_id() == ParentId && node->data->process_id() == ProcessId)
 			{
-				processes_new->remove(node);
+				process_list->remove(node);
+				PrintProcesses();
 				return;
 			}
 		}
 
-		char string[256] = { 0 };
-		const NTSTATUS status = GetImageName(ProcessId, string, sizeof(string));
+		String str;
+		const NTSTATUS status = GetImageName(ProcessId, &str);
 		if (status == STATUS_SUCCESS)
 		{
-			DebugLog("Did not have the process %p with imagename %s", ProcessId, string);
+			DebugLog("Did not have the process %p with imagename %s", ProcessId, str.buffer());
 		}
 		else
 		{
 			DebugLog("Did not have the process %p and GetImageName failed with %02x", ProcessId, status);
 		}
-
-
 	}
-
-
-
-	//DbgPrint("Process created with ParentId: %p ProcessId: %p and Create: %d\n", ParentId, ProcessId, Create);
 }
 
 extern "C" NTSTATUS DriverDeviceAdd(
@@ -156,111 +157,76 @@ extern "C" VOID DriverUnload(IN WDFDRIVER Driver)
 
 	DebugLog("Unloading driver special");
 
-	if (processes_new != NULL)
+	if (process_list != NULL)
 	{
 		PsSetCreateProcessNotifyRoutine(CreateProcessNotifyRoutine, TRUE);
-		delete processes_new;
+		delete process_list;
 	}
 }
 
 
-NTSTATUS PrintProcesses2()
+NTSTATUS PrintProcesses()
 {
 	PAGED_CODE();
 
-	DebugLog("****** Processes2 ******");
+	DebugLog("****** Processes ******");
 
-	for (auto node = processes_new->head(); node != nullptr; node = node->next)
+	for (auto node = process_list->head(); node != nullptr; node = node->next)
 	{
-		DebugLog("%s %p %p", node->data->ImageName, node->data->ParentId, node->data->ProcessId);
+		DebugLog("%s %p %p", node->data->image_name.buffer(), node->data->parent_id(), node->data->process_id());
 	}
-
-	DebugLog("************************");
+	DebugLog("%zu processes in list", process_list->count());
+	DebugLog("***********************");
 
 	return STATUS_SUCCESS;
 }
 
 
-NTSTATUS GetImageName(HANDLE ProcessId, char* string, SIZE_T size)
+NTSTATUS GetImageName(HANDLE ProcessId, String* string)
 {
 	PAGED_CODE();
 
 	NTSTATUS status = STATUS_ACCESS_DENIED;
-	PEPROCESS pe_process = NULL;
 
-	status = PsLookupProcessByProcessId(ProcessId, &pe_process);
+	PEProcessWrapper process_wrapper;
+
+	status = PsLookupProcessByProcessId(ProcessId, &process_wrapper.pe_process);
 
 	if (status != STATUS_SUCCESS) return status;
-	if (pe_process == NULL) return STATUS_FWP_NULL_POINTER;
+	if (process_wrapper.pe_process == nullptr) return STATUS_FWP_NULL_POINTER;
 
-	HANDLE process_handle = NULL;
+	ObHandleWrapper process_handle_wrapper;
 
-	status = ObOpenObjectByPointer(pe_process, 0, NULL, 0, 0, KernelMode, &process_handle);
+	status = ObOpenObjectByPointer(process_wrapper.pe_process, 0, nullptr, 0, nullptr, KernelMode,
+	                               &process_handle_wrapper.handle);
 
-	if (status != STATUS_SUCCESS)
-	{
-		ObDereferenceObject(pe_process);
-		return status;
-	}
-	if (process_handle == NULL)
-	{
-		ObDereferenceObject(pe_process);
-		return status;
-	}
+
+	if (status != STATUS_SUCCESS) return status;
+	if (process_handle_wrapper.handle == nullptr) return STATUS_FWP_NULL_POINTER;
 
 	ULONG returned_length = 0;
 
-	status = ZwQueryInformationProcess(process_handle, ProcessImageFileName, NULL,
-		0, &returned_length);
+	status = ZwQueryInformationProcess(process_handle_wrapper.handle, ProcessImageFileName, nullptr, 0, &returned_length);
 
-	if (STATUS_INFO_LENGTH_MISMATCH != status)
-	{
-		ZwClose(process_handle);
-		ObDereferenceObject(pe_process);
-		return status;
-	}
+	if (STATUS_INFO_LENGTH_MISMATCH != status) return status;
 
-	PVOID buffer = ExAllocatePoolWithTag(PagedPool, returned_length, 'ipgD');
-	if (buffer == NULL)
-	{
-		ZwClose(process_handle);
-		ObDereferenceObject(pe_process);
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
+	const BufferWrapper buffer_wrapper(returned_length);
 
-	status = ZwQueryInformationProcess(process_handle, ProcessImageFileName, buffer,
-		returned_length, &returned_length);
+	if (buffer_wrapper.buffer<void>() == nullptr) return STATUS_INSUFFICIENT_RESOURCES;
 
-	ZwClose(process_handle);
-	ObDereferenceObject(pe_process);
+	status = ZwQueryInformationProcess(process_handle_wrapper.handle, ProcessImageFileName,
+	                                   buffer_wrapper.buffer<void>(), returned_length, &returned_length);
 
-	if (status != STATUS_SUCCESS)
-	{
-		ExFreePool(buffer);
-		return status;
-	}
-
-	char ansi_string[512] = { 0 };
-
-	const int chars_written = sprintf_s(ansi_string, sizeof(ansi_string), "%wZ", (PUNICODE_STRING)buffer);
-
-	ExFreePool(buffer);
-
-	if (chars_written == -1) return STATUS_ACCESS_DENIED;
-
-	char* p = strrchr(ansi_string, '\\');
-
-	if (p == NULL)
-	{
-		p = ansi_string;
-	}
-	else if (*p == '\\')
-	{
-		p++;
-	}
+	if (status != STATUS_SUCCESS) return status;
 
 
-	if (strcpy_s(string, size, p) != 0) return STATUS_ABANDONED;
+
+	string->allocate(buffer_wrapper.buffer<UNICODE_STRING>());
+
+	auto p = strrchr(string->buffer(), '\\');
+	if (*p == '\\') p++;
+
+	string->allocate(p);
 
 	return STATUS_SUCCESS;
 }
@@ -269,10 +235,10 @@ HANDLE GetProcessHandle(const char* module_name)
 {
 	PAGED_CODE();
 
-	for (auto node = processes_new->head(); node != nullptr; node = node->next)
+	for (auto node = process_list->head(); node != nullptr; node = node->next)
 	{
-		if (strcmp(module_name, node->data->ImageName) == 0) return node->data->ProcessId;
+		if (strcmp(module_name, node->data->image_name.buffer()) == 0) return node->data->process_id();
 	}
 
-	return NULL;
+	return nullptr;
 }
