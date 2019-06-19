@@ -14,6 +14,7 @@
 
 LinkedList<ProcessInfo*>* process_list;
 
+UNICODE_STRING IoNtDeviceName = RTL_CONSTANT_STRING(L"\\Device\\IoNtMemoryReader");
 
 extern "C" NTSTATUS DriverEntry(
 	_In_ PDRIVER_OBJECT     DriverObject,
@@ -25,17 +26,24 @@ extern "C" NTSTATUS DriverEntry(
 	// NTSTATUS variable to record success or failure
 	NTSTATUS status = STATUS_SUCCESS;
 
-	UNICODE_STRING routineName;
-
-	RtlInitUnicodeString(&routineName, L"ZwQueryInformationProcess");
+	UNICODE_STRING routine_name = RTL_CONSTANT_STRING(L"ZwQueryInformationProcess");
 
 	ZwQueryInformationProcess =
-		static_cast<QUERY_INFO_PROCESS>(MmGetSystemRoutineAddress(&routineName));
+		QUERY_INFO_PROCESS(MmGetSystemRoutineAddress(&routine_name));
 
 	if (ZwQueryInformationProcess == nullptr)
 	{
 		DebugLog("Could not get ZwQueryInformationProcess");
-		return STATUS_ABANDONED;
+		return STATUS_FWP_NULL_POINTER;
+	}
+
+	//Create IoCtlDevice
+	PDEVICE_OBJECT device_object = nullptr;
+	status = IoCreateDevice(DriverObject, 0, &IoNtDeviceName, FILE_DEVICE_UNKNOWN, FILE_DEVICE_SECURE_OPEN, FALSE, &device_object);
+	if (status != STATUS_SUCCESS)
+	{
+		DebugLog("Could not create IoDevice. IoCreateDevice returned with %ld", status);
+		return status;
 	}
 
 	// Allocate the driver configuration object
@@ -56,7 +64,9 @@ extern "C" NTSTATUS DriverEntry(
 	}
 
 
-
+	DriverObject->MajorFunction[IRP_MJ_CREATE] = IoCtlCreateClose;
+	DriverObject->MajorFunction[IRP_MJ_CLOSE] = IoCtlCreateClose;
+	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = IoCtlDeviceControl;
 
 	// Initialize the driver configuration object to register the
 	// entry point for the EvtDeviceAdd callback, KmdfHelloWorldEvtDeviceAdd
@@ -66,6 +76,7 @@ extern "C" NTSTATUS DriverEntry(
 
 	config.EvtDriverUnload = DriverUnload;
 
+
 	// Finally, create the driver object
 	status = WdfDriverCreate(DriverObject,
 		RegistryPath,
@@ -74,6 +85,28 @@ extern "C" NTSTATUS DriverEntry(
 		WDF_NO_HANDLE
 	);
 	return status;
+}
+
+extern "C" NTSTATUS IoCtlCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+{
+	PAGED_CODE();
+
+	UNREFERENCED_PARAMETER(DeviceObject);
+	UNREFERENCED_PARAMETER(Irp);
+
+	DebugLog("IoCtlCreateClose called");
+	return STATUS_SUCCESS;
+}
+
+extern "C" NTSTATUS IoCtlDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+{
+	PAGED_CODE();
+
+	UNREFERENCED_PARAMETER(DeviceObject);
+	UNREFERENCED_PARAMETER(Irp);
+
+	DebugLog("IoCtlDeviceControl called");
+	return STATUS_SUCCESS;
 }
 
 
@@ -88,7 +121,7 @@ extern "C" VOID CreateProcessNotifyRoutine(HANDLE ParentId, HANDLE ProcessId, BO
 		const auto status = GetImageName(ProcessId, &process_info->image_name);
 		if (status != STATUS_SUCCESS)
 		{
-			process_info->image_name.allocate("GetImageName failed!");
+			process_info->image_name.allocate("GetImageName failed with exit code %ld", status);
 		}
 
 		process_list->insert(process_info);
