@@ -170,7 +170,7 @@
     <ClInclude Include="new.hpp" />
     <ClInclude Include="ObHandleWrapper.hpp" />
     <ClInclude Include="PEProcessWrapper.hpp" />
-    <ClInclude Include="ProcessInfo.h" />
+    <ClInclude Include="ProcessInfo.hpp" />
     <ClInclude Include="String.hpp" />
     <ClInclude Include="Util.h" />
   </ItemGroup>

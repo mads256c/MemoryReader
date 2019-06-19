@@ -3,7 +3,7 @@
 #include "Driver.hpp"
 #include "ListNode.hpp"
 #include "LinkedList.hpp"
-#include "ProcessInfo.h"
+#include "ProcessInfo.hpp"
 #include "PEProcessWrapper.hpp"
 #include "Util.h"
 #include "ObHandleWrapper.hpp"
@@ -34,7 +34,7 @@ extern "C" NTSTATUS DriverEntry(
 
 	if (ZwQueryInformationProcess == nullptr)
 	{
-		DbgPrint("MemoryReader: Could not get ZwQueryInformationProcess\n");
+		DebugLog("Could not get ZwQueryInformationProcess");
 		return STATUS_ABANDONED;
 	}
 
@@ -85,7 +85,7 @@ extern "C" VOID CreateProcessNotifyRoutine(HANDLE ParentId, HANDLE ProcessId, BO
 	{
 		auto process_info = new ProcessInfo(ParentId, ProcessId);
 
-		NTSTATUS status = GetImageName(ProcessId, &process_info->image_name);
+		const auto status = GetImageName(ProcessId, &process_info->image_name);
 		if (status != STATUS_SUCCESS)
 		{
 			process_info->image_name.allocate("GetImageName failed!");
